@@ -1,3 +1,38 @@
+# 任务2: 启动流程注释 [cite: 19]
+
+# 1. 设置段寄存器，确保从实模式开始执行
+movw    $0, %ax
+movw    %ax, %ds                # 初始化数据段寄存器
+movw    %ax, %es                # 初始化附加段寄存器
+movw    %ax, %ss                # 初始化栈段寄存器
+
+# 2. 开启 A20 总线 (解决早期 8086 内存回绕问题) [cite: 3]
+seta20.1:
+  inb     $0x64,%al
+  testb   $0x2,%al
+  jnz     seta20.1
+
+  movb    $0xd1,%al
+  outb    %al,$0x64
+
+# 3. 从实模式切换到 32 位保护模式 [cite: 3]
+lgdt    gdtdesc                 # 加载全局描述符表 (GDT)
+movl    %cr0, %eax
+orl     $CR0_PE_ON, %eax        # 设置 CR0 寄存器的保护模式使能位
+movl    %eax, %cr0              # 正式进入保护模式
+
+# 4. 跳转到 32 位代码段，清除流水线中的 16 位指令
+ljmp    $(SEG_KCODE<<3), $start32
+
+.code32  # 接下来进入 32 位模式执行
+start32:
+  # 设置保护模式下的堆栈
+  movw    $(SEG_KDATA<<3), %ax
+  movw    %ax, %ds
+  
+  # 5. 调用 bootmain.c 中的函数，开始加载内核 [cite: 6]
+  call    bootmain
+
 #include "asm.h"
 #include "memlayout.h"
 #include "mmu.h"
@@ -85,4 +120,5 @@ gdt:
 gdtdesc:
   .word   (gdtdesc - gdt - 1)             # sizeof(gdt) - 1
   .long   gdt                             # address gdt
+
 
